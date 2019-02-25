@@ -36,17 +36,33 @@ The first response of Rep came `r elections %>% filter(response %in% c("Rep", "D
 #Question 2: 
 
 ```{r echo = FALSE}
-elections <- elections %>% 
+elections1 <- elections %>% 
   select(response, race_eth, final_weight) %>%
   filter(response %in% c("Dem", "Rep", "Und"), race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>% 
   group_by(response, race_eth) %>%
-  summarize(total = sum(final_weight), number = count(), percentage = number/505) %>%
+  summarize(total = sum(final_weight)) %>%
   spread(key = response, value = total) %>% 
-  mutate(race =  factor(race_eth, levels = c("White", "Black", "Hispanic", "Asian", "Other"))) %>%
+  mutate(race = factor(race_eth, levels = c("White", "Black", "Hispanic", "Asian", "Other"))) %>%
   arrange(race)
-elections[is.na(elections)] <- 0
-elections %>%
+elections1[is.na(elections1)] <- 0
+elections1 %>%
   mutate(rowTotal = Dem + Rep + Und, Democrat = Dem/rowTotal, Republican = Rep/rowTotal, Undecided = Und/rowTotal, Number = rowTotal) %>%
   select(race, Number, Democrat, Republican, Undecided) 
  
 ```
+
+#Question 3:
+
+```{r echo = FALSE}
+elections %>%
+  filter(educ %in% c("Graduate or Professional Degree", "Bachelors' degree", "Some college or trade school", "High school", "Grade school")) %>%
+  mutate(educ = factor(educ, levels = c("Grade school", "High school", "Some college or trade school",   "Bachelors' degree", "Graduate or Professional Degree"))) %>%
+  group_by(educ) %>% 
+  ggplot(aes(x = educ, y = final_weight)) + geom_violin() +
+    # add individual points on top of violins
+  geom_jitter(alpha = 0.5, size = 1, width = .25) + coord_flip() +
+  labs(title = "More Educated Matter Less in North Carolina 9th", subtitle = "Poll gives more weight to people who are less likely to participate in polls", y = "Weight Given to Respondent in Calculating Poll Results", x = element_blank(), caption = "New York Times Upshot/Siena College 2018 live polls")
+
+
+```
+
