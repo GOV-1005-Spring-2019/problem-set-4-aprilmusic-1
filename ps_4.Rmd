@@ -6,15 +6,47 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-library()
+library(dplyr)
+library(knitr)
+library(readxl)
+library(tidyr)
+
+elections <- read_csv("ps_4_elections-poll-nc09-3.csv", col_types = cols(
+  .default = col_character(),
+  turnout_scale = col_double(),
+  turnout_score = col_double(),
+  w_LV = col_double(),
+  w_RV = col_double(),
+  final_weight = col_double(),
+  timestamp = col_datetime(format = "")
+))
 ```
+#Question 1
 
-There were X respondents who supported the Democratic candidate.
+There were `r elections %>% filter(response == "Dem") %>% summarize(dems = n())` respondents who supported the Democratic candidate.
 
-There were X more respondents who favored the Republican candidate than who were Undecided.
+There were `r elections %>% group_by(response) %>% filter(response %in% c("Rep", "Und")) %>% summarize(favorers = n()) %>% summarize(diff = favorers[1] - favorers[2])` more respondents who favored the Republican candidate than who were Undecided.
 
-There are two gender variables (gender and gender_combined). There are X individuals for whom these variables have different values.
+There are two gender variables (gender and gender_combined). There are `r elections %>% filter(gender != gender_combined) %>% summarize(diffs = n())` individuals for whom these variables have different values.
 
-There are X respondents listed as “White” under race_eth who are not listed as “White” under file_race_black.
+There are `r elections %>% filter(race_eth == "White", file_race_black != "White") %>% summarize(diffs = n())` respondents listed as “White” under race_eth who are not listed as “White” under file_race_black.
 
-The first response of Rep came X minutes (rounded to the nearest minute) before the first response of Dem.
+The first response of Rep came `r elections %>% filter(response %in% c("Rep", "Dem")) %>% group_by(response) %>% select(response, timestamp) %>% summarize(first = min(timestamp)) %>% summarize(diff = first[1] - first[2])` minutes (rounded to the nearest minute) before the first response of Dem.
+
+#Question 2: 
+
+```{r echo = FALSE}
+elections <- elections %>% 
+  select(response, race_eth, final_weight) %>%
+  filter(response %in% c("Dem", "Rep", "Und"), race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>% 
+  group_by(response, race_eth) %>%
+  summarize(total = sum(final_weight), number = count(), percentage = number/505) %>%
+  spread(key = response, value = total) %>% 
+  mutate(race =  factor(race_eth, levels = c("White", "Black", "Hispanic", "Asian", "Other"))) %>%
+  arrange(race)
+elections[is.na(elections)] <- 0
+elections %>%
+  mutate(rowTotal = Dem + Rep + Und, Democrat = Dem/rowTotal, Republican = Rep/rowTotal, Undecided = Und/rowTotal, Number = rowTotal) %>%
+  select(race, Number, Democrat, Republican, Undecided) 
+ 
+```
