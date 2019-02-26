@@ -5,6 +5,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# Loading in packages 
 library(tidyverse)
 library(dplyr)
 library(knitr)
@@ -12,6 +13,7 @@ library(readxl)
 library(tidyr)
 library(gt)
 
+# Reading in the data with the appropriate column types
 elections <- read_csv("ps_4_elections-poll-nc09-3.csv", col_types = cols(
   .default = col_character(),
   turnout_scale = col_double(),
@@ -22,57 +24,82 @@ elections <- read_csv("ps_4_elections-poll-nc09-3.csv", col_types = cols(
   timestamp = col_datetime(format = "")
 ))
 ```
-#Question 1
+#Question 1:
 
 There were `r elections %>% filter(response == "Dem") %>% summarize(dems = n())` respondents who supported the Democratic candidate.
 
 There were `r elections %>% group_by(response) %>% filter(response %in% c("Rep", "Und")) %>% summarize(favorers = n()) %>% summarize(diff = favorers[1] - favorers[2])` more respondents who favored the Republican candidate than who were Undecided.
 
-There are two gender variables (gender and gender_combined). There are `r elections %>% filter(gender != gender_combined) %>% summarize(diffs = n())` individuals for whom these variables have different values.
+There are two gender variables (`gender` and `gender_combined`). There are `r elections %>% filter(gender != gender_combined) %>% summarize(diffs = n())` individuals for whom these variables have different values.
 
-There are `r elections %>% filter(race_eth == "White", file_race_black != "White") %>% summarize(diffs = n())` respondents listed as “White” under race_eth who are not listed as “White” under file_race_black.
+There are `r elections %>% filter(race_eth == "White", file_race_black != "White") %>% summarize(diffs = n())` respondents listed as “White” under `race_eth` who are not listed as “White” under `file_race_black`.
 
-The first response of Rep came `r elections %>% filter(response %in% c("Rep", "Dem")) %>% group_by(response) %>% select(response, timestamp) %>% summarize(first = min(timestamp)) %>% summarize(diff = round(first[1] - first[2]))` minutes (rounded to the nearest minute) before the first response of Dem.
+The first response of Dem came `r elections %>% filter(response %in% c("Rep", "Dem")) %>% group_by(response) %>% select(response, timestamp) %>% summarize(first = min(timestamp)) %>% summarize(diff = round(first[2] - first[1]))` minutes (rounded to the nearest minute) before the first response of Rep.
 
 #Question 2: 
 
 ```{r echo = FALSE}
 elections1 <- elections %>% 
+  # Dealing only with these three variables
   select(response, race_eth, final_weight) %>%
-  filter(race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>% 
+  # Filtering out race responses (just NA) that are not in the tables
+  filter(race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>%
+  # Graphing by response and race_eth
   group_by(response, race_eth) %>%
+  # Sum the weighted values of each voter
   summarize(total = sum(final_weight)) %>%
+  # Factorize to keep in order
   mutate(race_eth = factor(race_eth, levels = c("White", "Black", "Hispanic", "Asian", "Other"))) %>%
-  spread(key = response, value = total) %>% 
-  arrange(race_eth)
+  # Spread to create Dem/Rep/Und columns
+  spread(key = response, value = total)
 
+# Replace all NAs with 0
 elections1[is.na(elections1)] <- 0
+# Get the percentages
 elections1 <- elections1 %>%
   mutate(rowTotal = Dem + Rep + Und + `3`, Democrat = Dem/rowTotal, Republican = Rep/rowTotal, Undecided = Und/rowTotal) %>%
-  select(race_eth, Democrat, Republican, Undecided) 
-  
+  # Don't want to have rowTotal or any other variabls in our table
+  select(race_eth, Democrat, Republican, Undecided) %>%
+  # Get rid of the column title for race_eth
+  rename(" " = "race_eth")
 
-gt(elections1) %>% tab_header(
+# Table creation
+gt(elections1) %>% 
+  # Titles
+  tab_header(
     title = md("**Party Vote Percentages By Race**"),
     subtitle = md("North Carolina’s 9th Congressional District")
   ) %>% 
-   tab_source_note(
+  # Source
+  tab_source_note(
     source_note = "Source: Siena College 2018 Live Poll Results."
   ) %>% 
+  # Percentage formatting for the numerical data
   fmt_percent(columns = vars(Democrat, Republican, Undecided),
-                decimals = 0)
+                decimals = 0) %>% 
+  # Get a - for the - value
+  na_if(0) %>% 
+  fmt_missing(columns = vars(Undecided), rows = 4)
 ```
 
 #Question 3:
 
 ```{r echo = FALSE}
+
 elections %>%
+  # Select only those who reported an education level
   filter(educ %in% c("Graduate or Professional Degree", "Bachelors' degree", "Some college or trade school", "High school", "Grade school")) %>%
-  mutate(educ = factor(educ, levels = c("Grade school", "High school", "Some college or trade school",   "Bachelors' degree", "Graduate or Professional Degree"))) %>%
+  # Factorize so it stays orderly
+  mutate(educ = factor(educ, levels = c("Grade school", "High school", "Some college or trade school", "Bachelors' degree", "Graduate or Professional Degree"))) %>%
+  # We want the data in groups
   group_by(educ) %>% 
+  # Start to graph - we want a violin with a jitter over it
   ggplot(aes(x = educ, y = final_weight)) + geom_violin() +
-    # add individual points on top of violins
-  geom_jitter(alpha = 0.5, size = 1, width = .25) + coord_flip() +
+  # Add individual points on top of violins
+  geom_jitter(alpha = 0.5, size = 1, width = .25) + 
+  # The way ggplot works, for some reason continuous variables have to be on the y axis
+  coord_flip() +
+  # Titles and captions and axes
   labs(title = "More Educated Matter Less in North Carolina 9th", subtitle = "Poll gives more weight to people who are less likely to participate in polls", y = "Weight Given to Respondent in Calculating Poll Results", x = element_blank(), caption = "New York Times Upshot/Siena College 2018 live polls")
 
 ```
@@ -81,11 +108,22 @@ elections %>%
 
 ```{r echo = FALSE}
 elections %>% 
+  # Get only responses to Dem, Rep, Und, and people for which we have age data
   filter(response %in% c("Dem", "Rep", "Und"), ager != "[DO NOT READ] Refused") %>% 
   select(response, ager) %>% 
+  # Group by them
   group_by(ager, response) %>% 
+  # Count the number of people who responded each way
   count(response) %>%
-  ggplot(aes(x = response, y = n, fill = ager)) + geom_col(position = "dodge2") +
+  rename("Ages" = "ager") %>%
+  # Plotting responses with color depending on age 
+  ggplot(aes(x = response, y = n, fill = Ages)) + 
+  # Separates out columns
+  geom_col(position = "dodge2") +
+  # Titles and axes
   labs(title = "Response by Age Range", caption = "Source: Siena College 2018 live polls", 
-       x = "Political Party", y = "Number of Responses")
+       x = "Political Party", y = "Number of Responses") 
 ```
+
+#Colleagues
+Chris Milne, Ilkin Bayramli
