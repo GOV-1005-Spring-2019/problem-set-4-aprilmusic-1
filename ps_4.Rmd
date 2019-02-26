@@ -32,30 +32,35 @@ There are two gender variables (gender and gender_combined). There are `r electi
 
 There are `r elections %>% filter(race_eth == "White", file_race_black != "White") %>% summarize(diffs = n())` respondents listed as “White” under race_eth who are not listed as “White” under file_race_black.
 
-The first response of Rep came `r elections %>% filter(response %in% c("Rep", "Dem")) %>% group_by(response) %>% select(response, timestamp) %>% summarize(first = min(timestamp)) %>% summarize(diff = round(first[2] - first[1]))` minutes (rounded to the nearest minute) before the first response of Dem.
+The first response of Rep came `r elections %>% filter(response %in% c("Rep", "Dem")) %>% group_by(response) %>% select(response, timestamp) %>% summarize(first = min(timestamp)) %>% summarize(diff = round(first[1] - first[2]))` minutes (rounded to the nearest minute) before the first response of Dem.
 
 #Question 2: 
 
 ```{r echo = FALSE}
 elections1 <- elections %>% 
   select(response, race_eth, final_weight) %>%
-  filter(response %in% c("Dem", "Rep", "Und"), race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>% 
+  filter(race_eth %in% c("White", "Black", "Hispanic", "Asian", "Other")) %>% 
   group_by(response, race_eth) %>%
   summarize(total = sum(final_weight)) %>%
   mutate(race_eth = factor(race_eth, levels = c("White", "Black", "Hispanic", "Asian", "Other"))) %>%
   spread(key = response, value = total) %>% 
   arrange(race_eth)
+
 elections1[is.na(elections1)] <- 0
 elections1 <- elections1 %>%
-  mutate(rowTotal = Dem + Rep + Und, Democrat = Dem/rowTotal, Republican = Rep/rowTotal, Undecided = Und/rowTotal, Number = rowTotal) %>%
+  mutate(rowTotal = Dem + Rep + Und + `3`, Democrat = Dem/rowTotal, Republican = Rep/rowTotal, Undecided = Und/rowTotal) %>%
   select(race_eth, Democrat, Republican, Undecided) 
+  
+
 gt(elections1) %>% tab_header(
     title = md("**Party Vote Percentages By Race**"),
     subtitle = md("North Carolina’s 9th Congressional District")
   ) %>% 
    tab_source_note(
     source_note = "Source: Siena College 2018 Live Poll Results."
-  ) 
+  ) %>% 
+  fmt_percent(columns = vars(Democrat, Republican, Undecided),
+                decimals = 0)
 ```
 
 #Question 3:
@@ -73,3 +78,14 @@ elections %>%
 ```
 
 #Question 4:
+
+```{r echo = FALSE}
+elections %>% 
+  filter(response %in% c("Dem", "Rep", "Und"), ager != "[DO NOT READ] Refused") %>% 
+  select(response, ager) %>% 
+  group_by(ager, response) %>% 
+  count(response) %>%
+  ggplot(aes(x = response, y = n, fill = ager)) + geom_col(position = "dodge2") +
+  labs(title = "Response by Age Range", caption = "Source: Siena College 2018 live polls", 
+       x = "Political Party", y = "Number of Responses")
+```
